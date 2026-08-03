@@ -319,3 +319,149 @@
   height: 100%;
   display: block;
 }
+
+.color-swatch {
+  width: clamp(72px, 20vw, 96px);
+  height: clamp(72px, 20vw, 96px);
+  border-radius: 50%;
+  box-shadow: 0 6px 18px var(--shadow);
+  border: 4px solid var(--surface-raised);
+}
+
+.color-option {
+  border: 4px solid rgba(255, 255, 255, 0.55);
+}
+
+.color-option.correct {
+  box-shadow: 0 0 0 4px var(--success);
+}
+
+.color-option.wrong {
+  opacity: 0.7;
+}
+
+.size-row {
+  gap: 1.5rem;
+  align-items: flex-end;
+}
+
+.size-tap {
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  box-shadow: 0 6px 20px var(--shadow);
+  display: grid;
+  place-items: center;
+  transition: transform 0.15s ease, background 0.2s ease;
+  animation: pop-in 0.35s ease;
+}
+
+.size-tap.is-big {
+  width: clamp(140px, 40vw, 180px);
+  height: clamp(140px, 40vw, 180px);
+  font-size: clamp(3.5rem, 14vw, 5rem);
+}
+
+.size-tap.is-small {
+  width: clamp(72px, 20vw, 96px);
+  height: clamp(72px, 20vw, 96px);
+  font-size: clamp(1.75rem, 7vw, 2.25rem);
+}
+
+.size-tap:active {
+  transform: scale(0.94);
+}
+
+.size-tap.correct {
+  background: rgba(106, 155, 120, 0.35);
+}
+
+.size-tap.wrong {
+  background: rgba(212, 137, 106, 0.25);
+}
+
+.scribble-root {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+  height: 100%;
+}
+
+.scribble-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-shrink: 0;
+}
+
+.scribble-swatch {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 50%;
+  box-shadow: 0 3px 10px var(--shadow);
+  border: 3px solid transparent;
+}
+
+.scribble-swatch.active {
+  border-color: var(--ink);
+  transform: scale(1.08);
+}
+
+.scribble-clear {
+  min-height: 44px;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  box-shadow: 0 3px 10px var(--shadow);
+  font-weight: 800;
+}
+
+.scribble-canvas-host {
+  flex: 1;
+  min-height: 0;
+}
+
+.stack-playfield {
+  gap: 1rem;
+}
+
+.stack-area {
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  min-height: 220px;
+  width: min(280px, 80%);
+  padding: 1rem;
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow: inset 0 0 0 2px rgba(122, 158, 138, 0.2);
+}
+
+.stack-block {
+  width: 70%;
+  height: 36px;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px var(--shadow);
+  animation: pop-in 0.3s ease backwards;
+}
+
+.stack-btn {
+  width: clamp(88px, 24vw, 112px);
+  height: clamp(88px, 24vw, 112px);
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-size: 2.5rem;
+  font-weight: 800;
+  box-shadow: 0 8px 22px var(--shadow);
+  transition: transform 0.15s ease;
+}
+
+.stack-btn:active {
+  transform: scale(0.92);
+}

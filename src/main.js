@@ -10,8 +10,24 @@ import { shapeMatch } from './games/shape-match.js';
 import { findAnimal } from './games/find-animal.js';
 import { countTap } from './games/count-tap.js';
 import { memoryPairs } from './games/memory-pairs.js';
+import { colorMatch } from './games/color-match.js';
+import { bigOrSmall } from './games/big-or-small.js';
+import { catchStars } from './games/catch-stars.js';
+import { scribble } from './games/scribble.js';
+import { stackBlocks } from './games/stack-blocks.js';
 
-const games = [bubblePop, shapeMatch, findAnimal, countTap, memoryPairs];
+const games = [
+  bubblePop,
+  shapeMatch,
+  findAnimal,
+  countTap,
+  memoryPairs,
+  colorMatch,
+  bigOrSmall,
+  catchStars,
+  scribble,
+  stackBlocks,
+];
 const byId = Object.fromEntries(games.map((g) => [g.id, g]));
 
 const app = document.querySelector('#app');
