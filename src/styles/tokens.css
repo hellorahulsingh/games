@@ -1,0 +1,23 @@
+:root {
+  --bg: #e8efe8;
+  --bg-deep: #d4e0d6;
+  --surface: #f4f7f4;
+  --surface-raised: #ffffff;
+  --accent: #7a9e8a;
+  --accent-strong: #5f8570;
+  --accent-2: #d4896a;
+  --accent-2-soft: #e8b39a;
+  --ink: #3d4a42;
+  --ink-soft: #6b7a72;
+  --success: #6a9b78;
+  --warn: #c4a35a;
+  --shadow: rgba(61, 74, 66, 0.12);
+  --radius: 20px;
+  --radius-sm: 14px;
+  --tap-min: 64px;
+  --font: "Nunito", system-ui, sans-serif;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}

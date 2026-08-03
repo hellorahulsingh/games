@@ -1,0 +1,321 @@
+.game-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 0%, rgba(122, 158, 138, 0.2), transparent 60%),
+    var(--bg);
+}
+
+.game-hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding:
+    calc(0.75rem + var(--safe-top))
+    calc(0.75rem + var(--safe-right))
+    0.75rem
+    calc(0.75rem + var(--safe-left));
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.game-hud-left,
+.game-hud-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hud-btn {
+  min-width: var(--tap-min);
+  min-height: 48px;
+  padding: 0 1rem;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  box-shadow: 0 4px 14px var(--shadow);
+  font-weight: 800;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  transition: transform 0.15s ease;
+}
+
+.hud-btn:active {
+  transform: scale(0.94);
+}
+
+.hud-btn.icon-only {
+  width: 48px;
+  padding: 0;
+  font-size: 1.25rem;
+}
+
+.hud-session {
+  background: var(--surface-raised);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  box-shadow: 0 4px 14px var(--shadow);
+  font-weight: 800;
+  font-size: 1.15rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.hud-session .star {
+  color: var(--accent-2);
+}
+
+.game-stage {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  padding:
+    0.5rem
+    calc(0.75rem + var(--safe-right))
+    calc(0.75rem + var(--safe-bottom))
+    calc(0.75rem + var(--safe-left));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-stage > * {
+  width: 100%;
+  height: 100%;
+  max-width: 720px;
+  max-height: 100%;
+}
+
+/* Shared game layouts */
+.playfield {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 1rem;
+}
+
+.prompt {
+  font-size: clamp(1.25rem, 4vw, 1.75rem);
+  font-weight: 800;
+  text-align: center;
+  color: var(--ink);
+}
+
+.prompt-visual {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 80px;
+}
+
+.options-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  width: 100%;
+}
+
+.big-tap {
+  width: clamp(88px, 28vw, 120px);
+  height: clamp(88px, 28vw, 120px);
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  box-shadow: 0 6px 20px var(--shadow);
+  display: grid;
+  place-items: center;
+  font-size: clamp(2rem, 8vw, 3rem);
+  transition: transform 0.15s ease, background 0.2s ease;
+  animation: pop-in 0.35s ease;
+}
+
+.big-tap:active {
+  transform: scale(0.92);
+}
+
+.big-tap.correct {
+  background: rgba(106, 155, 120, 0.35);
+}
+
+.big-tap.wrong {
+  background: rgba(212, 137, 106, 0.25);
+}
+
+.doors-row {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.door {
+  width: clamp(100px, 28vw, 140px);
+  height: clamp(140px, 36vw, 180px);
+  border-radius: var(--radius);
+  background: var(--accent);
+  box-shadow: 0 8px 24px var(--shadow);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.15s ease;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 1rem;
+}
+
+.door:active {
+  transform: scale(0.96);
+}
+
+.door-face {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, var(--accent) 0%, var(--accent-strong) 100%);
+  transition: transform 0.35s ease;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.door.open .door-face {
+  transform: translateY(-100%);
+}
+
+.door-animal {
+  font-size: clamp(2.5rem, 10vw, 3.5rem);
+  opacity: 0;
+  transition: opacity 0.2s ease 0.15s;
+  z-index: 1;
+}
+
+.door.open .door-animal {
+  opacity: 1;
+}
+
+.count-orbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  justify-content: center;
+  max-width: 400px;
+}
+
+.count-orb {
+  width: clamp(72px, 20vw, 96px);
+  height: clamp(72px, 20vw, 96px);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--accent-2-soft), var(--accent-2));
+  box-shadow: 0 6px 18px var(--shadow);
+  transition: transform 0.15s ease, opacity 0.2s ease;
+  animation: pop-in 0.3s ease;
+}
+
+.count-orb:active {
+  transform: scale(0.88);
+}
+
+.count-orb.tapped {
+  opacity: 0.35;
+  transform: scale(0.75);
+  pointer-events: none;
+}
+
+.dots-row {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+}
+
+.dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.memory-card {
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  perspective: 600px;
+  cursor: pointer;
+  min-height: var(--tap-min);
+}
+
+.memory-card-inner {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  transition: transform 0.35s ease;
+  transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
+}
+
+.memory-card.flipped .memory-card-inner,
+.memory-card.matched .memory-card-inner {
+  transform: rotateY(180deg);
+}
+
+.memory-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 4px 14px var(--shadow);
+  font-size: clamp(1.75rem, 7vw, 2.5rem);
+}
+
+.memory-back {
+  background: var(--accent);
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.memory-front {
+  background: var(--surface-raised);
+  transform: rotateY(180deg);
+}
+
+.memory-card.matched .memory-front {
+  background: rgba(106, 155, 120, 0.3);
+}
+
+.canvas-wrap {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: linear-gradient(180deg, #dfeadf 0%, #c9d8cb 100%);
+  box-shadow: inset 0 0 0 3px rgba(122, 158, 138, 0.25);
+  position: relative;
+  touch-action: none;
+}
+
+.canvas-wrap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
