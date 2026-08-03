@@ -10,8 +10,9 @@ import { shapeMatch } from './games/shape-match.js';
 import { findAnimal } from './games/find-animal.js';
 import { countTap } from './games/count-tap.js';
 import { memoryPairs } from './games/memory-pairs.js';
+import { dinoRun } from './games/dino-run.js';
 
-const games = [bubblePop, shapeMatch, findAnimal, countTap, memoryPairs];
+const games = [bubblePop, shapeMatch, findAnimal, countTap, memoryPairs, dinoRun];
 const byId = Object.fromEntries(games.map((g) => [g.id, g]));
 
 const app = document.querySelector('#app');
