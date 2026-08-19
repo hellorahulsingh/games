@@ -91,6 +91,10 @@
   max-height: 100%;
 }
 
+.game-stage:has(.ludo-root) > * {
+  max-width: 920px;
+}
+
 /* Shared game layouts */
 .playfield {
   display: flex;

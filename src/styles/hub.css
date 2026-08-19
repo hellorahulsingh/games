@@ -133,6 +133,7 @@
 .game-card:nth-child(8) { animation-delay: 0.4s; }
 .game-card:nth-child(9) { animation-delay: 0.45s; }
 .game-card:nth-child(10) { animation-delay: 0.5s; }
+.game-card:nth-child(11) { animation-delay: 0.55s; }
 
 .game-card:active {
   transform: scale(0.96);

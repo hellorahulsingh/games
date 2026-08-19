@@ -15,6 +15,7 @@ import { bigOrSmall } from './games/big-or-small.js';
 import { catchStars } from './games/catch-stars.js';
 import { scribble } from './games/scribble.js';
 import { stackBlocks } from './games/stack-blocks.js';
+import { ludo } from './games/ludo.js';
 
 const games = [
   bubblePop,
@@ -27,6 +28,7 @@ const games = [
   catchStars,
   scribble,
   stackBlocks,
+  ludo,
 ];
 const byId = Object.fromEntries(games.map((g) => [g.id, g]));
 

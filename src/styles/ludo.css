@@ -1,0 +1,227 @@
+.ludo-root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  min-height: 0;
+}
+
+.ludo-mode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.ludo-sub {
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.ludo-mode-btn,
+.ludo-again {
+  min-width: 220px;
+  min-height: var(--tap-min);
+  padding: 0.85rem 1.4rem;
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+  box-shadow: 0 6px 20px var(--shadow);
+  font-weight: 800;
+  font-size: 1.15rem;
+  animation: pop-in 0.35s ease;
+}
+
+.ludo-mode-btn:active,
+.ludo-again:active {
+  transform: scale(0.96);
+}
+
+.ludo-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  width: min(100%, 520px);
+  flex-shrink: 0;
+}
+
+.ludo-who {
+  font-weight: 800;
+  font-size: clamp(0.9rem, 3.4vw, 1.05rem);
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  box-shadow: 0 3px 10px var(--shadow);
+}
+
+.ludo-who[data-turn="0"] {
+  box-shadow: 0 0 0 3px rgba(212, 137, 106, 0.45);
+}
+
+.ludo-who[data-turn="1"] {
+  box-shadow: 0 0 0 3px rgba(122, 158, 138, 0.5);
+}
+
+.ludo-homes {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.ludo-home-pip {
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  box-shadow: 0 3px 10px var(--shadow);
+}
+
+.ludo-home-pip.coral {
+  color: var(--accent-2);
+}
+
+.ludo-home-pip.sage {
+  color: var(--accent-strong);
+}
+
+.ludo-board {
+  display: grid;
+  grid-template-columns: repeat(15, 1fr);
+  grid-template-rows: repeat(15, 1fr);
+  width: min(100%, calc(100dvh - 220px), 520px);
+  aspect-ratio: 1;
+  background: #cfd9d1;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px var(--shadow);
+  flex-shrink: 1;
+}
+
+.ludo-cell {
+  position: relative;
+  border: 0.5px solid rgba(61, 74, 66, 0.12);
+  min-width: 0;
+  min-height: 0;
+}
+
+.ludo-cell.path {
+  background: var(--surface-raised);
+}
+
+.ludo-cell.yard.coral {
+  background: rgba(212, 137, 106, 0.35);
+}
+
+.ludo-cell.yard.sage {
+  background: rgba(122, 158, 138, 0.38);
+}
+
+.ludo-cell.yard.muted {
+  background: rgba(244, 247, 244, 0.55);
+}
+
+.ludo-cell.home.coral {
+  background: rgba(212, 137, 106, 0.55);
+}
+
+.ludo-cell.home.sage {
+  background: rgba(122, 158, 138, 0.55);
+}
+
+.ludo-cell.center {
+  background: linear-gradient(135deg, rgba(212, 137, 106, 0.45), rgba(122, 158, 138, 0.45));
+}
+
+.ludo-cell.empty {
+  background: #d5e0d7;
+}
+
+.ludo-safe {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: clamp(8px, 1.8vw, 11px);
+  color: var(--warn);
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.ludo-piece {
+  position: absolute;
+  width: 78%;
+  height: 78%;
+  left: 11%;
+  top: 11%;
+  border-radius: 50%;
+  z-index: 2;
+  transform: translate(var(--dx, 0), var(--dy, 0));
+  box-shadow: 0 2px 6px rgba(61, 74, 66, 0.28), inset 0 2px 0 rgba(255, 255, 255, 0.45);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+}
+
+.ludo-piece.p0 {
+  background: radial-gradient(circle at 35% 30%, #e8b39a, #d4896a 55%, #b56b4f);
+}
+
+.ludo-piece.p1 {
+  background: radial-gradient(circle at 35% 30%, #b5cbbd, #7a9e8a 55%, #5f8570);
+}
+
+.ludo-piece.can-move {
+  z-index: 3;
+  animation: soft-pulse 0.9s ease infinite;
+}
+
+.ludo-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-shrink: 0;
+}
+
+.ludo-dice {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border-radius: 16px;
+  background: var(--surface-raised);
+  box-shadow: 0 6px 18px var(--shadow);
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.ludo-dice:disabled {
+  opacity: 0.7;
+}
+
+.ludo-dice:not(:disabled):active {
+  transform: scale(0.94);
+}
+
+.ludo-again {
+  min-width: unset;
+  padding: 0.6rem 1.1rem;
+  font-size: 1rem;
+}
+
+@media (orientation: landscape) and (max-height: 520px) {
+  .ludo-root {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .ludo-bar {
+    width: 100%;
+  }
+
+  .ludo-board {
+    width: min(100%, calc(100dvh - 96px), 420px);
+  }
+}
