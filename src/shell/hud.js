@@ -1,6 +1,6 @@
 import { getScore, resetSession, subscribe } from './score.js';
 import { toggleFullscreen, isFullscreen, onFullscreenChange } from './fullscreen.js';
-import { isMuted, toggleMute } from './audio.js';
+import { isMuted, toggleMute, unlockAudio } from './audio.js';
 
 export function createHud(root, { title, onBack }) {
   resetSession();
@@ -44,6 +44,7 @@ export function createHud(root, { title, onBack }) {
 
   root.querySelector('[data-back]').addEventListener('click', onBack);
   muteBtn.addEventListener('click', () => {
+    unlockAudio();
     muteBtn.textContent = toggleMute() ? '🔇' : '🔊';
   });
   fsBtn.addEventListener('click', () => toggleFullscreen());

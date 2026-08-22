@@ -1,6 +1,6 @@
 import { getScore, subscribe } from './score.js';
 import { toggleFullscreen, isFullscreen, onFullscreenChange } from './fullscreen.js';
-import { isMuted, toggleMute } from './audio.js';
+import { isMuted, toggleMute, unlockAudio } from './audio.js';
 
 export function renderHub(root, games, onSelect) {
   const { total } = getScore();
@@ -52,13 +52,17 @@ export function renderHub(root, games, onSelect) {
   });
 
   muteBtn.addEventListener('click', () => {
+    unlockAudio();
     muteBtn.textContent = toggleMute() ? '🔇' : '🔊';
   });
 
   fsBtn.addEventListener('click', () => toggleFullscreen());
 
   root.querySelectorAll('[data-game]').forEach((btn) => {
-    btn.addEventListener('click', () => onSelect(btn.dataset.game));
+    btn.addEventListener('click', () => {
+      unlockAudio();
+      onSelect(btn.dataset.game);
+    });
   });
 
   return () => {

@@ -1,6 +1,6 @@
 import '../styles/ludo.css';
 import { addPoints } from '../shell/score.js';
-import { playSuccess, playSoft, playWrong, playVictory, playMoveStep, playDiceTick, playDiceLand } from '../shell/audio.js';
+import { playSuccess, playSoft, playWrong, playVictory, playMoveStep, playDiceTick, playDiceLand, playChomp } from '../shell/audio.js';
 import { spawnStarFloat, spawnVictoryBurst, pulseWin, pointerClient } from '../shared/feedback.js';
 import {
   SIZE,
@@ -99,6 +99,7 @@ export const ludo = {
     let rolling = false;
     let animating = false;
     let hoppingToken = null;
+    let hopRaf = 0;
 
     function resetTokens() {
       tokens = freshTokens();
@@ -160,12 +161,17 @@ export const ludo = {
       return `
         <div class="ludo-corner hue-${hue}${active ? ' active' : ''}${winner ? ' winner' : ''}${mine ? ' mine' : ''}">
           <div class="ludo-progress">${progressDots(player, homeCount(player))}</div>
-          <button
-            type="button"
-            class="ludo-dice hue-${hue}${canTap ? ' can-roll' : ' is-idle'}${rolling && turn === player ? ' rolling' : ''}"
-            data-dice="${player}"
-            aria-label="Dice"
-          >${diceDisplay(player)}</button>
+          <div class="ludo-dice-wrap">
+            <span class="ludo-dice-wave" aria-hidden="true"></span>
+            <span class="ludo-dice-wave" aria-hidden="true"></span>
+            <span class="ludo-dice-wave" aria-hidden="true"></span>
+            <button
+              type="button"
+              class="ludo-dice hue-${hue}${canTap ? ' can-roll' : ' is-idle'}${rolling && turn === player ? ' rolling' : ''}"
+              data-dice="${player}"
+              aria-label="Dice"
+            >${diceDisplay(player)}</button>
+          </div>
         </div>
       `;
     }
@@ -392,21 +398,29 @@ export const ludo = {
       `;
     }
 
+    function boardFlipped() {
+      return vsFriend && myPlayer === 1;
+    }
+
     function render() {
       if (phase === 'mode') {
+        root.classList.remove('ludo-flipped');
         root.innerHTML = modeScreen();
         bindJoinInput();
         return;
       }
 
+      const near = boardFlipped() ? 1 : 0;
+      const far = boardFlipped() ? 0 : 1;
+      root.classList.toggle('ludo-flipped', boardFlipped());
       root.innerHTML = `
         <div class="ludo-layout">
           <div class="ludo-board-frame">
-            <div class="ludo-dice-slot tr">${playerCorner(1)}</div>
+            <div class="ludo-dice-slot tr">${playerCorner(far)}</div>
             <div class="ludo-board-wrap">
               <div class="ludo-board" data-board></div>
             </div>
-            <div class="ludo-dice-slot bl">${playerCorner(0)}</div>
+            <div class="ludo-dice-slot bl">${playerCorner(near)}</div>
             ${phase === 'won' ? victoryOverlay() : ''}
             ${phase === 'won' ? '<button type="button" class="ludo-replay" data-again aria-label="Play again">↻</button>' : ''}
           </div>
@@ -461,7 +475,7 @@ export const ludo = {
           cell.className = `ludo-cell ${cellClass(r, c)}`;
           cell.dataset.r = String(r);
           cell.dataset.c = String(c);
-          if (SAFE.has(key(r, c))) {
+        if (SAFE.has(key(r, c))) {
             const star = document.createElement('span');
             star.className = 'ludo-safe';
             star.textContent = '★';
@@ -504,6 +518,13 @@ export const ludo = {
           cell.appendChild(hit);
         }
 
+        const stacked = group.length > 1;
+        if (stacked) {
+          cell.classList.add('has-stack');
+          const same = group.every((t) => t.player === group[0].player);
+          if (same || SAFE.has(cellKey)) cell.classList.add('safe-stack');
+        }
+
         group.forEach((t, i) => {
           const piece = document.createElement('button');
           piece.type = 'button';
@@ -511,8 +532,15 @@ export const ludo = {
           piece.dataset.piece = '1';
           piece.dataset.player = String(t.player);
           piece.dataset.index = String(t.index);
-          piece.style.setProperty('--dx', `${(i % 2) * 22 - (group.length > 1 ? 11 : 0)}%`);
-          piece.style.setProperty('--dy', `${Math.floor(i / 2) * 22 - (group.length > 2 ? 11 : 0)}%`);
+          if (stacked) {
+            piece.classList.add('stacked');
+            piece.style.setProperty('--dx', `${(i - (group.length - 1) / 2) * 12}%`);
+            piece.style.setProperty('--dy', `${-i * 26}%`);
+            piece.style.zIndex = String(4 + i);
+          } else {
+            piece.style.setProperty('--dx', '0');
+            piece.style.setProperty('--dy', '0');
+          }
           const canMove = picking && movable.some((m) => m.token === t);
           if (canMove) {
             piece.classList.add('can-move');
@@ -522,21 +550,29 @@ export const ludo = {
             piece.classList.add('winner-piece');
             piece.style.animationDelay = `${t.index * 0.18}s`;
           }
-          if (hoppingToken === t) piece.classList.add('hopping');
+          if (hoppingToken === t) return;
           piece.setAttribute('aria-label', 'Piece');
           cell.appendChild(piece);
         });
       }
     }
 
+    function yardPart(r, c, r0, c0) {
+      const lr = r - r0;
+      const lc = c - c0;
+      if ((lr === 1 || lr === 4) && (lc === 1 || lc === 4)) return 'pad';
+      if (lr === 0 || lr === 5 || lc === 0 || lc === 5) return 'frame';
+      return 'nest';
+    }
+
     function cellClass(r, c) {
       const k = key(r, c);
       const safeHue = SAFE_COLOR[k];
       if (safeHue) return `path safe ${safeHue}`;
-      if (r >= 9 && r <= 14 && c <= 5) return 'yard red';
-      if (r <= 5 && c >= 9) return 'yard yellow';
-      if (r <= 5 && c <= 5) return 'yard green';
-      if (r >= 9 && c >= 9) return 'yard blue';
+      if (r >= 9 && r <= 14 && c <= 5) return `yard red ${yardPart(r, c, 9, 0)}`;
+      if (r <= 5 && c >= 9) return `yard yellow ${yardPart(r, c, 0, 9)}`;
+      if (r <= 5 && c <= 5) return `yard green ${yardPart(r, c, 0, 0)}`;
+      if (r >= 9 && c >= 9) return `yard blue ${yardPart(r, c, 9, 9)}`;
       if (c === 7 && r >= 9 && r <= 13) return 'home red';
       if (c === 7 && r >= 1 && r <= 5) return 'home yellow';
       if (r === 7 && c >= 1 && c <= 5) return 'home green';
@@ -577,6 +613,7 @@ export const ludo = {
       }
       movable = phase === 'move' ? movesFor(turn, dice) : [];
       render();
+      queueAutoMove();
     }
 
     function dropNet() {
@@ -804,6 +841,21 @@ export const ludo = {
       tick();
     }
 
+    function queueAutoMove() {
+      if (phase !== 'move' || movable.length !== 1 || animating) return;
+      if (!canControlTurn() && !isComputerTurn()) return;
+      const move = movable[0];
+      later(() => {
+        if (!alive || phase !== 'move' || movable.length !== 1 || animating) return;
+        if (!canControlTurn() && !isComputerTurn()) return;
+        if (vsFriend) {
+          net?.send({ type: 'move', token: move.token.index });
+          return;
+        }
+        applyMove(move);
+      }, isComputerTurn() ? 520 : 360);
+    }
+
     function finishRoll(value) {
       rolling = false;
       dice = value;
@@ -834,14 +886,7 @@ export const ludo = {
 
       phase = 'move';
       render();
-
-      if (movable.length === 1 && isComputerTurn()) {
-        later(() => {
-          if (phase !== 'move' || movable.length !== 1) return;
-          applyMove(movable[0]);
-        }, 500);
-        return;
-      }
+      queueAutoMove();
 
       if (isComputerTurn() && movable.length > 1) {
         later(() => {
@@ -886,7 +931,6 @@ export const ludo = {
       if (capture) {
         capture.pos = -1;
         addPoints(1);
-        playWrong();
       }
 
       if (dest >= FINISH) {
@@ -923,7 +967,7 @@ export const ludo = {
 
       render();
       later(() => {
-        if (dice === 6) {
+        if (dice === 6 || capture || dest >= FINISH) {
           phase = 'roll';
           render();
           if (isComputerTurn()) later(startRoll, 500);
@@ -931,6 +975,110 @@ export const ludo = {
           nextTurn();
         }
       }, 350);
+    }
+
+    function cellCenter(board, pos, token) {
+      const [r, c] = cellFor(token.player, token.index, pos);
+      const cell = board.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+      if (!cell) return null;
+      return {
+        x: cell.offsetLeft + cell.offsetWidth / 2,
+        y: cell.offsetTop + cell.offsetHeight / 2,
+        size: Math.min(cell.offsetWidth, cell.offsetHeight),
+      };
+    }
+
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - ((-2 * t + 2) ** 3) / 2;
+    }
+
+    function hopTo(board, fly, fromPos, toPos, token, duration, chomp = false) {
+      const a = cellCenter(board, fromPos, token);
+      const b = cellCenter(board, toPos, token);
+      if (!a || !b) return Promise.resolve();
+      const size = a.size * 0.82;
+      fly.style.width = `${size}px`;
+      fly.style.height = `${size}px`;
+      const dist = Math.hypot(b.x - a.x, b.y - a.y);
+      const lift = chomp ? Math.min(18, 6 + dist * 0.18) : Math.min(32, 12 + dist * 0.32);
+      const angle = Math.atan2(b.y - a.y, b.x - a.x);
+      if (chomp) fly.classList.add('eater');
+
+      return new Promise((resolve) => {
+        const start = performance.now();
+        const tick = (now) => {
+          if (!alive) {
+            resolve();
+            return;
+          }
+          const t = Math.min(1, (now - start) / duration);
+          const e = easeInOutCubic(t);
+          const x = a.x + (b.x - a.x) * e;
+          const y = a.y + (b.y - a.y) * e - Math.sin(Math.PI * e) * lift;
+          const s = 1 + Math.sin(Math.PI * e) * (chomp ? 0.1 : 0.14);
+          const rot = chomp ? ` rotate(${angle}rad)` : '';
+          fly.style.transform = `translate(${x - size / 2}px, ${y - size / 2}px) scale(${s})${rot}`;
+          if (t < 1) {
+            hopRaf = requestAnimationFrame(tick);
+          } else {
+            hopRaf = 0;
+            fly.style.setProperty('--eat-rot', `${angle}rad`);
+            resolve();
+          }
+        };
+        hopRaf = requestAnimationFrame(tick);
+      });
+    }
+
+    function gulpEat(board, fly, dest, token, capture) {
+      const at = cellCenter(board, dest, token);
+      const victim = board.querySelector(
+        `[data-piece][data-player="${capture.player}"][data-index="${capture.index}"]`,
+      );
+      const size = at ? at.size * 0.82 : 28;
+      const x = at ? at.x : 0;
+      const y = at ? at.y : 0;
+      const rot = fly.style.getPropertyValue('--eat-rot') || '0rad';
+
+      fly.classList.add('eater', 'eating');
+      victim?.classList.add('is-eaten');
+      playChomp();
+
+      if (at) {
+        for (let i = 0; i < 7; i += 1) {
+          const crumb = document.createElement('span');
+          crumb.className = `ludo-crumb hue-${PLAYERS[capture.player].hue}`;
+          crumb.style.left = `${x}px`;
+          crumb.style.top = `${y}px`;
+          crumb.style.setProperty('--dx', `${Math.cos((i / 7) * Math.PI * 2) * (18 + (i % 3) * 10)}px`);
+          crumb.style.setProperty('--dy', `${Math.sin((i / 7) * Math.PI * 2) * (16 + (i % 2) * 8)}px`);
+          crumb.style.animationDelay = `${i * 0.03}s`;
+          board.appendChild(crumb);
+          later(() => crumb.remove(), 700);
+        }
+      }
+
+      return new Promise((resolve) => {
+        const start = performance.now();
+        const duration = 620;
+        const tick = (now) => {
+          if (!alive) {
+            resolve();
+            return;
+          }
+          const t = Math.min(1, (now - start) / duration);
+          const bite = 1 + Math.sin(t * Math.PI * 6) * 0.1;
+          const gulp = t > 0.45 ? 1 + (t - 0.45) * 0.25 : bite;
+          fly.style.transform = `translate(${x - size / 2}px, ${y - size / 2}px) rotate(${rot}) scale(${gulp})`;
+          if (t < 1) {
+            hopRaf = requestAnimationFrame(tick);
+          } else {
+            hopRaf = 0;
+            resolve();
+          }
+        };
+        hopRaf = requestAnimationFrame(tick);
+      });
     }
 
     function applyMove(move, x, y) {
@@ -956,24 +1104,51 @@ export const ludo = {
 
       const board = getBoard();
       paintBoard(board);
+      if (!board) {
+        token.pos = dest;
+        completeMove(move, x, y, capture);
+        return;
+      }
 
-      const hopMs = Math.min(150, Math.max(85, 750 / steps.length));
-      let i = 0;
+      const fly = document.createElement('div');
+      fly.className = `ludo-piece ludo-piece-fly hue-${PLAYERS[token.player].hue}`;
+      board.appendChild(fly);
 
-      const step = () => {
-        if (!alive) return;
-        if (i >= steps.length) {
+      const startAt = cellCenter(board, from, token);
+      if (startAt) {
+        const size = startAt.size * 0.82;
+        fly.style.width = `${size}px`;
+        fly.style.height = `${size}px`;
+        fly.style.transform = `translate(${startAt.x - size / 2}px, ${startAt.y - size / 2}px)`;
+      }
+
+      const hopMs = steps.length > 4 ? 200 : 240;
+      const last = steps[steps.length - 1];
+      let prev = from;
+      let chain = Promise.resolve();
+      for (const pos of steps) {
+        const nextPos = pos;
+        const fromPos = prev;
+        const chomp = Boolean(capture) && pos === last;
+        chain = chain.then(() => {
+          if (!alive) return;
+          playMoveStep();
+          return hopTo(board, fly, fromPos, nextPos, token, chomp ? hopMs + 80 : hopMs, chomp);
+        });
+        prev = nextPos;
+      }
+
+      chain
+        .then(() => {
+          if (!alive || !capture) return;
+          return gulpEat(board, fly, dest, token, capture);
+        })
+        .then(() => {
+          if (!alive) return;
+          fly.remove();
+          token.pos = dest;
           completeMove(move, x, y, capture);
-          return;
-        }
-        token.pos = steps[i];
-        i += 1;
-        playMoveStep();
-        paintBoard(board);
-        later(step, hopMs);
-      };
-
-      step();
+        });
     }
 
     function nextTurn() {
@@ -995,6 +1170,8 @@ export const ludo = {
 
     this._stop = () => {
       alive = false;
+      if (hopRaf) cancelAnimationFrame(hopRaf);
+      hopRaf = 0;
       dropNet();
       root.removeEventListener('click', onTap);
       root.removeEventListener('touchend', onTap);

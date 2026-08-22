@@ -36,13 +36,17 @@ export const PLAYERS = [
   },
 ];
 
-export const SAFE = new Set(['13,6', '6,1', '1,8', '8,13']);
+export const SAFE = new Set(['13,6', '6,1', '1,8', '8,13', '8,2', '2,6', '6,12', '12,8']);
 
 export const SAFE_COLOR = {
   '13,6': 'red',
   '6,1': 'green',
   '1,8': 'yellow',
   '8,13': 'blue',
+  '8,2': 'star',
+  '2,6': 'star',
+  '6,12': 'star',
+  '12,8': 'star',
 };
 
 export function key(r, c) {
@@ -106,11 +110,30 @@ function tokenAtCell(tokens, r, c) {
   });
 }
 
+function countByPlayer(here) {
+  const counts = [0, 0];
+  for (const t of here) {
+    if (t.player === 0 || t.player === 1) counts[t.player] += 1;
+  }
+  return counts;
+}
+
+export function isDoubleSafe(tokens, r, c) {
+  const counts = countByPlayer(tokenAtCell(tokens, r, c));
+  return counts[0] >= 2 || counts[1] >= 2;
+}
+
+export function isProtectedCell(tokens, r, c) {
+  return isSafeCell(r, c) || isDoubleSafe(tokens, r, c);
+}
+
 export function captureTarget(tokens, player, dest) {
   if (dest < 0 || dest >= HOME_START) return null;
   const [r, c] = destCell(player, dest);
-  if (isSafeCell(r, c)) return null;
-  const others = tokenAtCell(tokens, r, c).filter((t) => t.player !== player);
+  if (isProtectedCell(tokens, r, c)) return null;
+  const here = tokenAtCell(tokens, r, c);
+  if (here.length > 1) return null;
+  const others = here.filter((t) => t.player !== player);
   if (others.length === 1) return { player: others[0].player, index: others[0].index };
   return null;
 }
@@ -119,6 +142,7 @@ function blocked(tokens, player, dest) {
   if (dest < 0 || dest >= HOME_START) return false;
   const [r, c] = destCell(player, dest);
   if (isSafeCell(r, c)) return false;
+  if (isDoubleSafe(tokens, r, c)) return true;
   const others = tokenAtCell(tokens, r, c).filter((t) => t.player !== player);
   return others.length >= 2;
 }
@@ -207,7 +231,7 @@ export function applyMove(state, tokenIndex) {
     return { state: next, move, from, won: true };
   }
 
-  if (next.dice === 6) {
+  if (next.dice === 6 || move.capture || move.dest >= FINISH) {
     next.phase = 'roll';
   } else {
     advanceTurn(next);
