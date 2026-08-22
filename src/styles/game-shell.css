@@ -91,8 +91,19 @@
   max-height: 100%;
 }
 
+.game-stage:has(.ludo-root) {
+  max-width: none;
+  overflow: visible;
+  padding-left: calc(0.5rem + var(--safe-left));
+  padding-right: calc(0.5rem + var(--safe-right));
+}
+
 .game-stage:has(.ludo-root) > * {
-  max-width: 920px;
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  overflow: visible;
 }
 
 /* Shared game layouts */

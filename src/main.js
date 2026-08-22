@@ -60,7 +60,7 @@ function showHub() {
   });
 }
 
-function showGame(id) {
+function showGame(id, extra = {}) {
   const game = byId[id];
   if (!game) {
     location.hash = '#/';
@@ -75,16 +75,17 @@ function showGame(id) {
     },
   });
   activeGame = game;
-  game.start(hud.stage, {});
+  game.start(hud.stage, extra);
 }
 
 function route() {
   const hash = location.hash.replace(/^#\/?/, '');
   if (!hash || hash === '/') {
     showHub();
-  } else {
-    showGame(hash);
+    return;
   }
+  const [id, room] = hash.split('/');
+  showGame(id, { room });
 }
 
 window.addEventListener('hashchange', route);

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:worker": "wrangler dev --port 8787",
     "build": "vite build",
     "preview": "vite preview",
     "deploy": "npm run build && wrangler deploy"
@@ -12,5 +13,8 @@
   "devDependencies": {
     "vite": "^8.2.0",
     "wrangler": "^4.118.0"
+  },
+  "dependencies": {
+    "uqr": "^0.1.3"
   }
 }

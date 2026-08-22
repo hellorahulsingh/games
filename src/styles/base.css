@@ -114,6 +114,25 @@ svg {
   animation: star-float 0.7s ease-out forwards;
 }
 
+@keyframes victory-burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.4) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--vx), var(--vy)) scale(1.35) rotate(180deg);
+  }
+}
+
+.victory-burst-star {
+  position: fixed;
+  z-index: 1000;
+  font-size: clamp(1.1rem, 4vw, 1.75rem);
+  pointer-events: none;
+  animation: victory-burst 0.85s ease-out forwards;
+}
+
 .shake {
   animation: shake 0.35s ease;
 }
