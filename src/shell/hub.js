@@ -9,7 +9,7 @@ export function renderHub(root, games, onSelect) {
     <div class="hub">
       <div class="hub-top">
         <div class="hub-brand">
-          <h1>ITI Games</h1>
+          <h1>Games</h1>
           <p>Easy play for little minds</p>
         </div>
         <div class="hub-controls">

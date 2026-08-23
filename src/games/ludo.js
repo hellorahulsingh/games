@@ -10,11 +10,19 @@ import {
   PLAYERS,
   SAFE,
   SAFE_COLOR,
+  CARDS,
+  CARD_IDS,
   key,
   cellFor,
   rollDie,
   freshTokens,
+  freshState,
   legalMoves,
+  cardIsPlayable,
+  applyRoll as resolveRoll,
+  applyMove as resolveMove,
+  applyCard as resolveCard,
+  passDead as resolvePass,
 } from '../shared/ludo-engine.js';
 import { ROOM_CODE_RE, normalizeRoomCode, joinUrl } from '../shared/ludo-room.js';
 import { createLudoRoom, connectLudoRoom } from '../shared/ludo-net.js';
@@ -89,6 +97,7 @@ export const ludo = {
     let netIgnore = false;
     let joinTries = 0;
     let pendingNet = null;
+    let pendingLocal = null;
     let turn = 0;
     let dice = 0;
     let lastDice = [0, 0];
@@ -100,13 +109,20 @@ export const ludo = {
     let animating = false;
     let hoppingToken = null;
     let hopRaf = 0;
+    let cards = [[], []];
+    let roller = 0;
+    let swapBack = false;
+    let shield = [false, false];
+    let sixBefore = 0;
+    let helpOpen = false;
+    let helpIndex = 0;
 
     function resetTokens() {
       tokens = freshTokens();
     }
 
     function movesFor(player, value) {
-      return legalMoves(tokens, player, value)
+      return legalMoves(tokens, player, value, shield)
         .map((m) => ({
           token: tokens.find((t) => t.player === player && t.index === m.tokenIndex),
           dest: m.dest,
@@ -117,8 +133,44 @@ export const ludo = {
         .filter((m) => m.token);
     }
 
+    function gameSnapshot() {
+      return {
+        turn,
+        dice,
+        lastDice,
+        phase,
+        sixStreak,
+        sixBefore,
+        tokens,
+        winner: phase === 'won' ? turn : null,
+        cards,
+        roller,
+        swapBack,
+        shield,
+      };
+    }
+
+    function hueName(player) {
+      return PLAYERS[player].hue === 'red' ? 'Red' : 'Yellow';
+    }
+
     function isComputerTurn() {
       return vsComputer && turn === 1;
+    }
+
+    function isComputerRoller() {
+      return vsComputer && roller === 1;
+    }
+
+    function showCards() {
+      if (vsFriend) return friendReady;
+      return phase !== 'mode';
+    }
+
+    function trayIsMine(player) {
+      if (vsFriend && friendReady) return myPlayer === player;
+      if (vsComputer) return player === 0;
+      return player === turn;
     }
 
     function canControlTurn() {
@@ -134,16 +186,16 @@ export const ludo = {
     function canRoll(player) {
       return (
         phase === 'roll' &&
-        turn === player &&
+        roller === player &&
         !rolling &&
         !animating &&
-        !(isComputerTurn() && player === 1) &&
+        !(vsComputer && player === 1) &&
         !(vsFriend && myPlayer !== player)
       );
     }
 
     function diceValueFor(player) {
-      if (rolling && turn === player) return 1 + Math.floor(Math.random() * 6);
+      if (rolling && roller === player) return 1 + Math.floor(Math.random() * 6);
       if (turn === player && dice) return dice;
       return lastDice[player];
     }
@@ -154,26 +206,85 @@ export const ludo = {
 
     function playerCorner(player) {
       const hue = PLAYERS[player].hue;
-      const active = turn === player && phase !== 'mode' && phase !== 'won';
+      const active = (turn === player || roller === player) && phase !== 'mode' && phase !== 'won';
       const winner = phase === 'won' && turn === player;
       const canTap = canRoll(player);
       const mine = vsFriend && friendReady && myPlayer === player;
+      const guarded = Boolean(shield[player]);
       return `
-        <div class="ludo-corner hue-${hue}${active ? ' active' : ''}${winner ? ' winner' : ''}${mine ? ' mine' : ''}">
-          <div class="ludo-progress">${progressDots(player, homeCount(player))}</div>
+        <div class="ludo-corner hue-${hue}${active ? ' active' : ''}${winner ? ' winner' : ''}${mine ? ' mine' : ''}${guarded ? ' shielded' : ''}">
+          <div class="ludo-progress">${progressDots(player, homeCount(player))}${guarded ? '<span class="ludo-shield" aria-hidden="true">🛡️</span>' : ''}</div>
           <div class="ludo-dice-wrap">
             <span class="ludo-dice-wave" aria-hidden="true"></span>
             <span class="ludo-dice-wave" aria-hidden="true"></span>
             <span class="ludo-dice-wave" aria-hidden="true"></span>
             <button
               type="button"
-              class="ludo-dice hue-${hue}${canTap ? ' can-roll' : ' is-idle'}${rolling && turn === player ? ' rolling' : ''}"
+              class="ludo-dice hue-${hue}${canTap ? ' can-roll' : ' is-idle'}${rolling && roller === player ? ' rolling' : ''}"
               data-dice="${player}"
               aria-label="Dice"
             >${diceDisplay(player)}</button>
           </div>
         </div>
       `;
+    }
+
+    function canPlayCard(player, card) {
+      if (!showCards() || rolling || animating) return false;
+      if (vsFriend && myPlayer !== player) return false;
+      if (vsComputer && player === 1) return false;
+      return cardIsPlayable(gameSnapshot(), player, card);
+    }
+
+    function canPassNow(player) {
+      return (
+        showCards() &&
+        phase === 'dead' &&
+        player === turn &&
+        !rolling &&
+        !animating &&
+        canControlTurn()
+      );
+    }
+
+    function cardTray(player) {
+      if (!showCards()) return '';
+      const hand = cards[player] || [];
+      const mine = trayIsMine(player);
+      const items = hand.map((id) => {
+        const meta = CARDS[id];
+        if (!meta) return '';
+        const playable = canPlayCard(player, id);
+        return `
+          <button
+            type="button"
+            class="ludo-card${playable ? ' can-play' : ''}"
+            data-card="${id}"
+            data-card-player="${player}"
+            aria-label="${meta.label}"
+          >
+            <span class="ludo-card-icon" aria-hidden="true">${meta.icon}</span>
+            <span class="ludo-card-label">${meta.label}</span>
+          </button>
+        `;
+      }).join('');
+      const pass = canPassNow(player)
+        ? '<button type="button" class="ludo-card ludo-card-pass can-play" data-pass aria-label="Pass">Pass</button>'
+        : '';
+      if (!items && !pass) return '';
+      return `<div class="ludo-card-tray${mine ? ' mine' : ''}">${items}${pass}</div>`;
+    }
+
+    function cardStatus() {
+      if (!showCards() || phase === 'won') return '';
+      if (phase === 'dead') {
+        const mine = canControlTurn();
+        return `<div class="ludo-card-status" aria-live="polite">${mine ? 'No move — give or pass' : `${hueName(turn)} cannot move`}</div>`;
+      }
+      if (roller !== turn) {
+        return `<div class="ludo-card-status" aria-live="polite">${hueName(roller)} rolls for ${hueName(turn)}</div>`;
+      }
+      return '';
     }
 
     function backToModes() {
@@ -186,7 +297,93 @@ export const ludo = {
       render();
     }
 
+    function openHelp(cardId) {
+      const idx = CARD_IDS.indexOf(cardId);
+      helpIndex = idx >= 0 ? idx : 0;
+      helpOpen = true;
+      playSoft();
+      render();
+    }
+
+    function closeHelp() {
+      helpOpen = false;
+      playSoft();
+      render();
+    }
+
+    function helpOverlay() {
+      if (!helpOpen) return '';
+      const id = CARD_IDS[helpIndex] || CARD_IDS[0];
+      const meta = CARDS[id];
+      const picks = CARD_IDS.map((cardId, i) => {
+        const card = CARDS[cardId];
+        return `
+          <button
+            type="button"
+            class="ludo-help-pick${i === helpIndex ? ' is-on' : ''}"
+            data-help-card="${cardId}"
+            aria-label="${card.label}"
+          >
+            <span aria-hidden="true">${card.icon}</span>
+          </button>
+        `;
+      }).join('');
+      return `
+        <div class="ludo-help" data-help-overlay>
+          <div class="ludo-help-sheet">
+            <button type="button" class="ludo-help-close" data-help-close aria-label="Close">✕</button>
+            <div class="ludo-help-picks">${picks}</div>
+            <span class="ludo-help-icon" aria-hidden="true">${meta.icon}</span>
+            <strong class="ludo-help-title">${meta.label}</strong>
+            <p class="ludo-help-blurb">${meta.blurb}</p>
+            <div class="ludo-help-nav">
+              <button type="button" class="ludo-help-step" data-help-prev aria-label="Previous">←</button>
+              <span class="ludo-help-count">${helpIndex + 1} / ${CARD_IDS.length}</span>
+              <button type="button" class="ludo-help-step" data-help-next aria-label="Next">→</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     function onTap(e) {
+      const helpOpenBtn = e.target.closest('[data-help-open]');
+      if (helpOpenBtn) {
+        const now = Date.now();
+        if (now - lastTapAt < 280) return;
+        lastTapAt = now;
+        openHelp(CARD_IDS[helpIndex] || CARD_IDS[0]);
+        return;
+      }
+
+      if (helpOpen) {
+        const now = Date.now();
+        if (now - lastTapAt < 280) return;
+        lastTapAt = now;
+        if (e.target.closest('[data-help-close]') || e.target.closest('[data-help-overlay]') === e.target) {
+          closeHelp();
+          return;
+        }
+        const pick = e.target.closest('[data-help-card]');
+        if (pick) {
+          openHelp(pick.dataset.helpCard);
+          return;
+        }
+        if (e.target.closest('[data-help-prev]')) {
+          helpIndex = (helpIndex + CARD_IDS.length - 1) % CARD_IDS.length;
+          playSoft();
+          render();
+          return;
+        }
+        if (e.target.closest('[data-help-next]')) {
+          helpIndex = (helpIndex + 1) % CARD_IDS.length;
+          playSoft();
+          render();
+          return;
+        }
+        return;
+      }
+
       if (animating) return;
       const now = Date.now();
       if (now - lastTapAt < 280) return;
@@ -229,6 +426,36 @@ export const ludo = {
       if (diceBtn) {
         const player = Number(diceBtn.dataset.dice);
         if (canRoll(player)) startRoll();
+        return;
+      }
+
+      const passBtn = e.target.closest('[data-pass]');
+      if (passBtn) {
+        if (phase === 'dead' && canControlTurn() && !rolling && !animating) {
+          if (vsFriend && friendReady) {
+            net?.send({ type: 'pass' });
+            playSoft();
+          } else {
+            passLocal();
+          }
+        }
+        return;
+      }
+
+      const cardBtn = e.target.closest('[data-card]');
+      if (cardBtn) {
+        const card = cardBtn.dataset.card;
+        const player = Number(cardBtn.dataset.cardPlayer);
+        if (canPlayCard(player, card)) {
+          if (vsFriend && friendReady) {
+            net?.send({ type: 'play-card', card });
+            playSoft();
+          } else {
+            playLocalCard(player, card);
+          }
+        } else {
+          openHelp(card);
+        }
         return;
       }
 
@@ -289,7 +516,7 @@ export const ludo = {
         return;
       }
       const { x, y } = pointerClient(e);
-      applyMove(move, x, y);
+      startLocalMove(move, x, y);
     }
 
     function victoryConfetti() {
@@ -390,10 +617,13 @@ export const ludo = {
         `;
       }
       return `
-        <div class="ludo-mode">
-          <button type="button" class="ludo-mode-btn" data-mode="pvp" aria-label="Two players">👥</button>
-          <button type="button" class="ludo-mode-btn" data-mode="cpu" aria-label="Vs computer">🖥️</button>
-          <button type="button" class="ludo-mode-btn" data-mode="friend" aria-label="Play with a friend">🌐</button>
+        <div class="ludo-mode-stack">
+          <div class="ludo-mode">
+            <button type="button" class="ludo-mode-btn" data-mode="pvp" aria-label="Two players">👥</button>
+            <button type="button" class="ludo-mode-btn" data-mode="cpu" aria-label="Vs computer">🖥️</button>
+            <button type="button" class="ludo-mode-btn" data-mode="friend" aria-label="Play with a friend">🌐</button>
+          </div>
+          <button type="button" class="ludo-mode-text ludo-help-launch" data-help-open>Cards</button>
         </div>
       `;
     }
@@ -405,7 +635,7 @@ export const ludo = {
     function render() {
       if (phase === 'mode') {
         root.classList.remove('ludo-flipped');
-        root.innerHTML = modeScreen();
+        root.innerHTML = `${modeScreen()}${helpOverlay()}`;
         bindJoinInput();
         return;
       }
@@ -415,16 +645,19 @@ export const ludo = {
       root.classList.toggle('ludo-flipped', boardFlipped());
       root.innerHTML = `
         <div class="ludo-layout">
-          <div class="ludo-board-frame">
-            <div class="ludo-dice-slot tr">${playerCorner(far)}</div>
+          <div class="ludo-board-frame${showCards() ? ' has-cards' : ''}">
+            <button type="button" class="ludo-help-btn" data-help-open aria-label="How cards work">?</button>
+            <div class="ludo-dice-slot tr">${playerCorner(far)}${cardTray(far)}</div>
             <div class="ludo-board-wrap">
               <div class="ludo-board" data-board></div>
             </div>
-            <div class="ludo-dice-slot bl">${playerCorner(near)}</div>
+            <div class="ludo-dice-slot bl">${playerCorner(near)}${cardTray(near)}</div>
+            ${cardStatus()}
             ${phase === 'won' ? victoryOverlay() : ''}
             ${phase === 'won' ? '<button type="button" class="ludo-replay" data-again aria-label="Play again">↻</button>' : ''}
           </div>
         </div>
+        ${helpOverlay()}
       `;
 
       paintBoard(root.querySelector('[data-board]'));
@@ -448,19 +681,21 @@ export const ludo = {
       root.querySelectorAll('[data-dice]').forEach((btn) => {
         const player = Number(btn.dataset.dice);
         btn.innerHTML = diceDisplay(player);
-        btn.classList.toggle('rolling', rolling && turn === player);
+        btn.classList.toggle('rolling', rolling && roller === player);
         btn.classList.toggle('can-roll', canRoll(player));
         btn.classList.toggle('is-idle', !canRoll(player));
       });
       root.querySelectorAll('.ludo-corner').forEach((el) => {
         const player = Number(el.querySelector('[data-dice]')?.dataset.dice);
         if (Number.isNaN(player)) return;
-        el.classList.toggle('active', turn === player && phase !== 'won');
+        el.classList.toggle('active', (turn === player || roller === player) && phase !== 'won');
         el.classList.toggle('winner', phase === 'won' && turn === player);
       });
       PLAYERS.forEach((_, i) => {
         const el = root.querySelector(`[data-dice="${i}"]`)?.closest('.ludo-corner')?.querySelector('.ludo-progress');
-        if (el) el.innerHTML = progressDots(i, homeCount(i));
+        if (el) {
+          el.innerHTML = `${progressDots(i, homeCount(i))}${shield[i] ? '<span class="ludo-shield" aria-hidden="true">🛡️</span>' : ''}`;
+        }
       });
     }
 
@@ -523,6 +758,14 @@ export const ludo = {
           cell.classList.add('has-stack');
           const same = group.every((t) => t.player === group[0].player);
           if (same || SAFE.has(cellKey)) cell.classList.add('safe-stack');
+          group.sort((a, b) => {
+            const aMove = movable.some((m) => m.token === a);
+            const bMove = movable.some((m) => m.token === b);
+            if (aMove !== bMove) return aMove ? 1 : -1;
+            if (a.player === turn && b.player !== turn) return 1;
+            if (b.player === turn && a.player !== turn) return -1;
+            return a.player - b.player || a.index - b.index;
+          });
         }
 
         group.forEach((t, i) => {
@@ -532,16 +775,16 @@ export const ludo = {
           piece.dataset.piece = '1';
           piece.dataset.player = String(t.player);
           piece.dataset.index = String(t.index);
+          const canMove = picking && movable.some((m) => m.token === t);
           if (stacked) {
             piece.classList.add('stacked');
             piece.style.setProperty('--dx', `${(i - (group.length - 1) / 2) * 12}%`);
             piece.style.setProperty('--dy', `${-i * 26}%`);
-            piece.style.zIndex = String(4 + i);
+            piece.style.zIndex = String((canMove ? 10 : 4) + i);
           } else {
             piece.style.setProperty('--dx', '0');
             piece.style.setProperty('--dy', '0');
           }
-          const canMove = picking && movable.some((m) => m.token === t);
           if (canMove) {
             piece.classList.add('can-move');
             piece.style.animationDelay = `${t.index * 0.14}s`;
@@ -589,16 +832,14 @@ export const ludo = {
       vsFriend = false;
       friendReady = false;
       vsComputer = cpu;
-      turn = 0;
-      dice = 0;
-      lastDice = [0, 0];
-      sixStreak = 0;
-      movable = [];
       rolling = false;
+      animating = false;
+      hoppingToken = null;
+      pendingNet = null;
+      pendingLocal = null;
       resetTokens();
-      phase = 'roll';
       playSoft();
-      render();
+      assignState(freshState());
     }
 
     function assignState(s) {
@@ -607,6 +848,13 @@ export const ludo = {
       lastDice = [...s.lastDice];
       phase = s.phase;
       sixStreak = s.sixStreak;
+      sixBefore = s.sixBefore || 0;
+      cards = Array.isArray(s.cards)
+        ? [[...(s.cards[0] || [])], [...(s.cards[1] || [])]]
+        : [[], []];
+      roller = s.roller === 0 || s.roller === 1 ? s.roller : s.turn;
+      swapBack = Boolean(s.swapBack);
+      shield = [Boolean(s.shield?.[0]), Boolean(s.shield?.[1])];
       for (const t of tokens) {
         const n = s.tokens.find((x) => x.player === t.player && x.index === t.index);
         if (n) t.pos = n.pos;
@@ -614,6 +862,7 @@ export const ludo = {
       movable = phase === 'move' ? movesFor(turn, dice) : [];
       render();
       queueAutoMove();
+      queueCpu();
     }
 
     function dropNet() {
@@ -727,6 +976,7 @@ export const ludo = {
         animating = false;
         hoppingToken = null;
         pendingNet = null;
+        pendingLocal = null;
         resetTokens();
         playSoft();
         assignState(msg.state);
@@ -740,11 +990,18 @@ export const ludo = {
         onMoved(msg);
         return;
       }
+      if (msg.type === 'card-played') {
+        rolling = false;
+        playSoft();
+        assignState(msg.state);
+        return;
+      }
       if (msg.type === 'restart') {
         rolling = false;
         animating = false;
         hoppingToken = null;
         pendingNet = null;
+        pendingLocal = null;
         resetTokens();
         playSoft();
         assignState(msg.state);
@@ -767,6 +1024,10 @@ export const ludo = {
         lastDice[msg.player] = msg.value;
         playDiceLand(msg.value);
         if (msg.skip) {
+          if (msg.state?.phase === 'dead') {
+            assignState(msg.state);
+            return;
+          }
           phase = 'wait';
           render();
           if (msg.skip === 'sixes') playWrong();
@@ -782,6 +1043,7 @@ export const ludo = {
       }
 
       turn = msg.player;
+      roller = msg.state?.roller === 0 || msg.state?.roller === 1 ? msg.state.roller : msg.player;
       rolling = true;
       phase = 'roll';
       updateDiceUI();
@@ -841,59 +1103,103 @@ export const ludo = {
       tick();
     }
 
+    function playLocalCard(player, card) {
+      const next = resolveCard(gameSnapshot(), player, card);
+      if (!next) return false;
+      playSoft();
+      assignState(next);
+      return true;
+    }
+
+    function passLocal() {
+      const next = resolvePass(gameSnapshot(), turn);
+      if (!next) return;
+      playSoft();
+      assignState(next);
+    }
+
+    function startLocalMove(move, x, y) {
+      const result = resolveMove(gameSnapshot(), move.token.index);
+      if (!result) return;
+      pendingLocal = result;
+      const capture = result.move.capture
+        ? tokens.find((t) => t.player === result.move.capture.player && t.index === result.move.capture.index)
+        : null;
+      applyMove({ token: move.token, dest: result.move.dest, capture }, x, y);
+    }
+
+    function cpuTryPlus() {
+      if (!cardIsPlayable(gameSnapshot(), 1, 'plus')) return false;
+      const before = movesFor(1, dice);
+      const preview = resolveCard(gameSnapshot(), 1, 'plus');
+      if (!preview || preview.phase !== 'move') return false;
+      const after = legalMoves(preview.tokens, preview.turn, preview.dice, preview.shield);
+      const gained = after.some((m) => m.capture || m.dest >= FINISH);
+      const had = before.some((m) => m.capture || m.dest >= FINISH);
+      if (phase === 'dead' || (gained && !had)) {
+        return playLocalCard(1, 'plus');
+      }
+      return false;
+    }
+
+    function queueCpu() {
+      if (!vsComputer || rolling || animating || phase === 'won' || phase === 'mode') return;
+      later(() => {
+        if (!alive || !vsComputer || rolling || animating || phase === 'won') return;
+        if (phase === 'roll' && roller === 1) {
+          if (playLocalCard(1, 'shield')) return;
+          if (playLocalCard(1, 'swap')) return;
+          startRoll();
+          return;
+        }
+        if (phase === 'dead' && turn === 1) {
+          if (cpuTryPlus()) return;
+          if (playLocalCard(1, 'reroll')) return;
+          passLocal();
+          return;
+        }
+        if (phase === 'move' && turn === 1 && movable.length) {
+          if (cpuTryPlus()) return;
+          const move = movable.length === 1 ? movable[0] : pickComputerMove(movable);
+          startLocalMove(move);
+        }
+      }, 480);
+    }
+
     function queueAutoMove() {
       if (phase !== 'move' || movable.length !== 1 || animating) return;
-      if (!canControlTurn() && !isComputerTurn()) return;
+      if (isComputerTurn()) return;
+      if (!canControlTurn()) return;
       const move = movable[0];
       later(() => {
         if (!alive || phase !== 'move' || movable.length !== 1 || animating) return;
-        if (!canControlTurn() && !isComputerTurn()) return;
+        if (isComputerTurn() || !canControlTurn()) return;
         if (vsFriend) {
           net?.send({ type: 'move', token: move.token.index });
           return;
         }
-        applyMove(move);
-      }, isComputerTurn() ? 520 : 360);
+        startLocalMove(move);
+      }, 360);
     }
 
     function finishRoll(value) {
       rolling = false;
-      dice = value;
-      lastDice[turn] = value;
       playDiceLand(value);
-      if (value === 6) {
-        sixStreak += 1;
-        if (sixStreak >= 3) {
-          sixStreak = 0;
-          movable = [];
-          phase = 'wait';
-          render();
-          playWrong();
-          later(() => nextTurn(), 700);
+      const result = resolveRoll(gameSnapshot(), value);
+      if (result.skip) {
+        if (result.state.phase === 'dead') {
+          assignState(result.state);
           return;
         }
-      } else {
-        sixStreak = 0;
-      }
-
-      movable = movesFor(turn, value);
-      if (!movable.length) {
+        dice = value;
+        lastDice[result.rolledBy] = value;
         phase = 'wait';
         render();
-        later(() => nextTurn(), 750);
+        if (result.skip === 'sixes') playWrong();
+        later(() => assignState(result.state), 750);
         return;
       }
-
-      phase = 'move';
-      render();
-      queueAutoMove();
-
-      if (isComputerTurn() && movable.length > 1) {
-        later(() => {
-          const move = pickComputerMove(movable);
-          applyMove(move);
-        }, 550);
-      }
+      assignState(result.state);
     }
 
     function pickComputerMove(moves) {
@@ -941,25 +1247,28 @@ export const ludo = {
         playSoft();
       }
 
-      const won = vsFriend
-        ? Boolean(pendingNet?.won || pendingNet?.state?.phase === 'won')
+      const pending = pendingNet || pendingLocal;
+      const won = pending
+        ? Boolean(pending.won || pending.state?.phase === 'won')
         : tokens.filter((t) => t.player === turn && t.pos >= FINISH).length === 4;
       if (won) {
-        if (vsFriend && pendingNet?.state) {
+        if (pending?.state) {
           for (const t of tokens) {
-            const n = pendingNet.state.tokens.find((x) => x.player === t.player && x.index === t.index);
+            const n = pending.state.tokens.find((x) => x.player === t.player && x.index === t.index);
             if (n) t.pos = n.pos;
           }
-          turn = pendingNet.state.turn;
+          turn = pending.state.turn;
         }
         pendingNet = null;
+        pendingLocal = null;
         celebrateWin(x, y);
         return;
       }
 
-      if (vsFriend && pendingNet?.state) {
-        const next = pendingNet.state;
+      if (pending?.state) {
+        const next = pending.state;
         pendingNet = null;
+        pendingLocal = null;
         render();
         later(() => assignState(next), 350);
         return;
@@ -970,7 +1279,7 @@ export const ludo = {
         if (dice === 6 || capture || dest >= FINISH) {
           phase = 'roll';
           render();
-          if (isComputerTurn()) later(startRoll, 500);
+          if (isComputerRoller()) later(startRoll, 500);
         } else {
           nextTurn();
         }
@@ -1094,6 +1403,9 @@ export const ludo = {
       const steps = moveSteps(from, dest);
       if (!steps.length) {
         if (pendingNet?.state) assignState(pendingNet.state);
+        else if (pendingLocal?.state) assignState(pendingLocal.state);
+        pendingNet = null;
+        pendingLocal = null;
         return;
       }
 
@@ -1157,8 +1469,9 @@ export const ludo = {
       sixStreak = 0;
       movable = [];
       phase = 'roll';
+      roller = turn;
       render();
-      if (isComputerTurn()) later(startRoll, 650);
+      if (isComputerRoller()) later(startRoll, 650);
     }
 
     const invited = normalizeRoomCode(opts.room);

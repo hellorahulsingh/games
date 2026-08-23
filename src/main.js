@@ -15,6 +15,7 @@ import { bigOrSmall } from './games/big-or-small.js';
 import { catchStars } from './games/catch-stars.js';
 import { scribble } from './games/scribble.js';
 import { stackBlocks } from './games/stack-blocks.js';
+import { catchRabbit } from './games/catch-rabbit.js';
 import { ludo } from './games/ludo.js';
 
 const games = [
@@ -28,6 +29,7 @@ const games = [
   catchStars,
   scribble,
   stackBlocks,
+  catchRabbit,
   ludo,
 ];
 const byId = Object.fromEntries(games.map((g) => [g.id, g]));
