@@ -69,62 +69,10 @@ export function rollDie() {
   return 1 + Math.floor(Math.random() * 6);
 }
 
-export const CARD_IDS = ['swap', 'gift', 'shield', 'reroll', 'plus'];
-
-export const CARDS = {
-  swap: {
-    id: 'swap',
-    icon: '🔄',
-    label: 'Swap',
-    blurb: 'They roll the dice for you this turn. You roll for them next time.',
-  },
-  gift: {
-    id: 'gift',
-    icon: '🎁',
-    label: 'Give',
-    blurb: 'Rolled a number you cannot use? Send that number to the other player.',
-  },
-  shield: {
-    id: 'shield',
-    icon: '🛡️',
-    label: 'Shield',
-    blurb: 'The next time a piece would eat yours, yours stays put.',
-  },
-  reroll: {
-    id: 'reroll',
-    icon: '🎲',
-    label: 'Again',
-    blurb: 'Do not like this roll? Throw it away and roll again.',
-  },
-  plus: {
-    id: 'plus',
-    icon: '+1',
-    label: '+1',
-    blurb: 'Add 1 to your dice before you move. A 6 can become 7.',
-  },
-};
-
-function shuffled(list) {
-  const next = [...list];
-  for (let i = next.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [next[i], next[j]] = [next[j], next[i]];
-  }
-  return next;
-}
-
-export function dealHand() {
-  return shuffled(CARD_IDS).slice(0, 2);
-}
-
 export function freshTokens() {
   return [0, 1].flatMap((p) =>
     [0, 1, 2, 3].map((i) => ({ player: p, index: i, pos: -1 })),
   );
-}
-
-function emptyCards() {
-  return [[], []];
 }
 
 export function freshState() {
@@ -134,37 +82,20 @@ export function freshState() {
     lastDice: [0, 0],
     phase: 'roll',
     sixStreak: 0,
-    sixBefore: 0,
     tokens: freshTokens(),
     winner: null,
-    cards: [dealHand(), dealHand()],
-    roller: 0,
-    swapBack: false,
-    shield: [false, false],
   };
 }
 
 export function snapshotState(state) {
-  const turn = state.turn;
-  const cards = Array.isArray(state.cards)
-    ? [ [...(state.cards[0] || [])], [...(state.cards[1] || [])] ]
-    : emptyCards();
-  const shield = Array.isArray(state.shield)
-    ? [Boolean(state.shield[0]), Boolean(state.shield[1])]
-    : [false, false];
   return {
-    turn,
+    turn: state.turn,
     dice: state.dice,
-    lastDice: [...(state.lastDice || [0, 0])],
+    lastDice: [...state.lastDice],
     phase: state.phase,
-    sixStreak: state.sixStreak || 0,
-    sixBefore: state.sixBefore || 0,
+    sixStreak: state.sixStreak,
     tokens: state.tokens.map((t) => ({ player: t.player, index: t.index, pos: t.pos })),
     winner: state.winner ?? null,
-    cards,
-    roller: state.roller === 0 || state.roller === 1 ? state.roller : turn,
-    swapBack: Boolean(state.swapBack),
-    shield,
   };
 }
 
@@ -216,11 +147,7 @@ function blocked(tokens, player, dest) {
   return others.length >= 2;
 }
 
-function movesForValue(state, player, value) {
-  return legalMoves(state.tokens, player, value, state.shield);
-}
-
-export function legalMoves(tokens, player, value, shield = [false, false]) {
+export function legalMoves(tokens, player, value) {
   const moves = [];
   for (const t of tokens.filter((x) => x.player === player)) {
     if (t.pos >= FINISH) continue;
@@ -233,82 +160,26 @@ export function legalMoves(tokens, player, value, shield = [false, false]) {
       if (dest > FINISH) continue;
     }
     if (blocked(tokens, player, dest)) continue;
-    const threat = captureTarget(tokens, player, dest);
-    const capture = threat && !shield[threat.player] ? threat : null;
     moves.push({
       tokenIndex: t.index,
       dest,
-      capture,
+      capture: captureTarget(tokens, player, dest),
     });
   }
   return moves;
-}
-
-export function hasCard(state, player, card) {
-  return Boolean(state.cards?.[player]?.includes(card));
-}
-
-export function canHoldDead(state, player = state.turn) {
-  return hasCard(state, player, 'gift') || hasCard(state, player, 'reroll') || hasCard(state, player, 'plus');
-}
-
-function takeCard(state, player, card) {
-  const hand = state.cards[player];
-  if (!hand) return false;
-  const i = hand.indexOf(card);
-  if (i < 0) return false;
-  hand.splice(i, 1);
-  return true;
-}
-
-export function cardIsPlayable(state, player, card) {
-  if (player !== state.turn) return false;
-  if (!hasCard(state, player, card)) return false;
-  const roller = state.roller === 0 || state.roller === 1 ? state.roller : state.turn;
-  if (card === 'swap') {
-    return state.phase === 'roll' && roller === state.turn;
-  }
-  if (card === 'shield') {
-    return state.phase === 'roll';
-  }
-  if (card === 'gift') {
-    return state.phase === 'dead';
-  }
-  if (card === 'reroll' || card === 'plus') {
-    return state.phase === 'move' || state.phase === 'dead';
-  }
-  return false;
 }
 
 export function advanceTurn(state) {
   state.turn = state.turn === 0 ? 1 : 0;
   state.dice = 0;
   state.sixStreak = 0;
-  state.sixBefore = 0;
   state.phase = 'roll';
   state.winner = null;
-  if (state.swapBack) {
-    state.roller = state.turn === 0 ? 1 : 0;
-    state.swapBack = false;
-  } else {
-    state.roller = state.turn;
-  }
   return state;
-}
-
-function finishDeadOrSkip(next, value) {
-  if (canHoldDead(next, next.turn)) {
-    next.phase = 'dead';
-    return { state: next, skip: 'none', rolledBy: next.turn, value };
-  }
-  const rolledBy = next.turn;
-  advanceTurn(next);
-  return { state: next, skip: 'none', rolledBy, value };
 }
 
 export function applyRoll(state, value) {
   const next = snapshotState(state);
-  next.sixBefore = next.sixStreak;
   next.dice = value;
   next.lastDice[next.turn] = value;
 
@@ -323,25 +194,18 @@ export function applyRoll(state, value) {
     next.sixStreak = 0;
   }
 
-  if (skip === 'sixes') {
+  if (!skip && !legalMoves(next.tokens, next.turn, value).length) {
+    skip = 'none';
+  }
+
+  if (skip) {
     const rolledBy = next.turn;
     advanceTurn(next);
     return { state: next, skip, rolledBy, value };
   }
 
-  if (!movesForValue(next, next.turn, value).length) {
-    return finishDeadOrSkip(next, value);
-  }
-
   next.phase = 'move';
   return { state: next, skip: null, rolledBy: next.turn, value };
-}
-
-function consumeShieldIfNeeded(next, dest) {
-  const threat = captureTarget(next.tokens, next.turn, dest);
-  if (threat && next.shield[threat.player]) {
-    next.shield[threat.player] = false;
-  }
 }
 
 export function applyMove(state, tokenIndex) {
@@ -349,10 +213,9 @@ export function applyMove(state, tokenIndex) {
   const token = next.tokens.find((t) => t.player === next.turn && t.index === tokenIndex);
   if (!token) return null;
   const from = token.pos;
-  const move = movesForValue(next, next.turn, next.dice).find((m) => m.tokenIndex === tokenIndex);
+  const move = legalMoves(next.tokens, next.turn, next.dice).find((m) => m.tokenIndex === tokenIndex);
   if (!move) return null;
 
-  consumeShieldIfNeeded(next, move.dest);
   token.pos = move.dest;
   if (move.capture) {
     const cap = next.tokens.find(
@@ -370,73 +233,8 @@ export function applyMove(state, tokenIndex) {
 
   if (next.dice === 6 || move.capture || move.dest >= FINISH) {
     next.phase = 'roll';
-    next.dice = 0;
   } else {
     advanceTurn(next);
   }
   return { state: next, move, from, won: false };
-}
-
-function applyGift(next) {
-  const opp = next.turn === 0 ? 1 : 0;
-  const value = next.dice;
-  next.swapBack = false;
-  next.turn = opp;
-  next.roller = opp;
-  next.lastDice[opp] = value;
-  if (!movesForValue(next, opp, value).length) {
-    advanceTurn(next);
-    return next;
-  }
-  next.phase = 'move';
-  return next;
-}
-
-function applyReroll(next) {
-  next.sixStreak = next.sixBefore || 0;
-  next.dice = 0;
-  next.phase = 'roll';
-  return next;
-}
-
-function applyPlus(next) {
-  next.dice += 1;
-  next.lastDice[next.turn] = next.dice;
-  if (movesForValue(next, next.turn, next.dice).length) {
-    next.phase = 'move';
-    return next;
-  }
-  if (canHoldDead(next, next.turn)) {
-    next.phase = 'dead';
-    return next;
-  }
-  advanceTurn(next);
-  return next;
-}
-
-export function applyCard(state, player, card) {
-  if (!cardIsPlayable(state, player, card)) return null;
-  const next = snapshotState(state);
-  if (!takeCard(next, player, card)) return null;
-
-  if (card === 'swap') {
-    next.roller = next.turn === 0 ? 1 : 0;
-    next.swapBack = true;
-    return next;
-  }
-  if (card === 'shield') {
-    next.shield[player] = true;
-    return next;
-  }
-  if (card === 'gift') return applyGift(next);
-  if (card === 'reroll') return applyReroll(next);
-  if (card === 'plus') return applyPlus(next);
-  return null;
-}
-
-export function passDead(state, player) {
-  if (state.phase !== 'dead' || player !== state.turn) return null;
-  const next = snapshotState(state);
-  advanceTurn(next);
-  return next;
 }

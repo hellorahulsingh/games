@@ -1,9 +1,7 @@
 import {
-  applyCard,
   applyMove,
   applyRoll,
   freshState,
-  passDead,
   rollDie,
 } from '../src/shared/ludo-engine.js';
 import { makeRoomCode, ROOM_CODE_RE } from '../src/shared/ludo-room.js';
@@ -160,10 +158,8 @@ export class LudoRoom {
     const game = await this.ctx.storage.get('game');
     if (!game) return;
 
-    const roller = game.roller === 0 || game.roller === 1 ? game.roller : game.turn;
-
     if (msg.type === 'roll') {
-      if (game.phase !== 'roll' || roller !== player) return;
+      if (game.phase !== 'roll' || game.turn !== player) return;
       const value = rollDie();
       const result = applyRoll(game, value);
       await this.ctx.storage.put('game', result.state);
@@ -192,33 +188,6 @@ export class LudoRoom {
         capture: result.move.capture,
         won: result.won,
         state: result.state,
-      });
-      return;
-    }
-
-    if (msg.type === 'play-card') {
-      const card = String(msg.card || '');
-      const next = applyCard(game, player, card);
-      if (!next) return;
-      await this.ctx.storage.put('game', next);
-      this.broadcast({
-        type: 'card-played',
-        player,
-        card,
-        state: next,
-      });
-      return;
-    }
-
-    if (msg.type === 'pass') {
-      const next = passDead(game, player);
-      if (!next) return;
-      await this.ctx.storage.put('game', next);
-      this.broadcast({
-        type: 'card-played',
-        player,
-        card: 'pass',
-        state: next,
       });
       return;
     }
