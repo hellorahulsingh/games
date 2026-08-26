@@ -487,6 +487,10 @@
   z-index: 4;
 }
 
+.ludo-cell.has-movable {
+  z-index: 8;
+}
+
 .ludo-cell.safe-stack:not(.path.safe)::after {
   content: '★';
   position: absolute;
@@ -512,8 +516,11 @@
 
 .ludo-cell-hit {
   position: absolute;
-  inset: -4px;
-  z-index: 12;
+  left: -6px;
+  right: -6px;
+  bottom: -6px;
+  top: -55%;
+  z-index: 20;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.14);
   border: 2px dashed rgba(255, 255, 255, 0.75);
@@ -521,6 +528,11 @@
   animation: ludo-cell-pick 1.35s ease-in-out infinite;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  pointer-events: auto;
+}
+
+.ludo-cell:has(.ludo-cell-hit) .ludo-piece {
+  pointer-events: none;
 }
 
 .ludo-piece {
@@ -658,10 +670,6 @@
 .ludo-crumb.hue-yellow { background: var(--ludo-yellow); }
 .ludo-crumb.hue-green { background: var(--ludo-green); }
 .ludo-crumb.hue-blue { background: var(--ludo-blue); }
-
-.ludo-cell.has-movable {
-  z-index: 2;
-}
 
 .ludo-cell.has-movable::before {
   content: '';

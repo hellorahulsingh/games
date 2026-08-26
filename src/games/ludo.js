@@ -514,24 +514,11 @@ export const ludo = {
         const cell = board.querySelector(`[data-r="${r}"][data-c="${c}"]`);
         if (!cell) continue;
 
-        const movableHere = group.filter((t) => movable.some((m) => m.token === t));
+        const isMovable = (t) =>
+          movable.some((m) => m.token.player === t.player && m.token.index === t.index);
+        const movableHere = group.filter(isMovable);
         if (picking && movableHere.length > 0) {
           cell.classList.add('has-movable');
-        }
-        if (
-          movableHere.length === 1 &&
-          phase === 'move' &&
-          canControlTurn()
-        ) {
-          const t = movableHere[0];
-          const hit = document.createElement('button');
-          hit.type = 'button';
-          hit.className = 'ludo-cell-hit';
-          hit.dataset.cellMove = '1';
-          hit.dataset.player = String(t.player);
-          hit.dataset.index = String(t.index);
-          hit.setAttribute('aria-label', 'Move piece');
-          cell.appendChild(hit);
         }
 
         const stacked = group.length > 1;
@@ -540,8 +527,8 @@ export const ludo = {
           const same = group.every((t) => t.player === group[0].player);
           if (same || SAFE.has(cellKey)) cell.classList.add('safe-stack');
           group.sort((a, b) => {
-            const aMove = movable.some((m) => m.token === a);
-            const bMove = movable.some((m) => m.token === b);
+            const aMove = isMovable(a);
+            const bMove = isMovable(b);
             if (aMove !== bMove) return aMove ? 1 : -1;
             if (a.player === turn && b.player !== turn) return 1;
             if (b.player === turn && a.player !== turn) return -1;
@@ -556,7 +543,7 @@ export const ludo = {
           piece.dataset.piece = '1';
           piece.dataset.player = String(t.player);
           piece.dataset.index = String(t.index);
-          const canMove = picking && movable.some((m) => m.token === t);
+          const canMove = picking && isMovable(t);
           if (stacked) {
             piece.classList.add('stacked');
             piece.style.setProperty('--dx', `${(i - (group.length - 1) / 2) * 12}%`);
@@ -578,6 +565,18 @@ export const ludo = {
           piece.setAttribute('aria-label', 'Piece');
           cell.appendChild(piece);
         });
+
+        if (movableHere.length === 1 && picking) {
+          const t = movableHere[0];
+          const hit = document.createElement('button');
+          hit.type = 'button';
+          hit.className = 'ludo-cell-hit';
+          hit.dataset.cellMove = '1';
+          hit.dataset.player = String(t.player);
+          hit.dataset.index = String(t.index);
+          hit.setAttribute('aria-label', 'Move piece');
+          cell.appendChild(hit);
+        }
       }
     }
 
